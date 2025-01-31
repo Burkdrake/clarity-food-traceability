@@ -7,7 +7,8 @@
         production-date: uint,
         location: (string-ascii 100),
         status: (string-ascii 20),
-        current-holder: principal
+        current-holder: principal,
+        certifications: (list 10 (string-ascii 30))
     }
 )
 
@@ -20,10 +21,19 @@
     }
 )
 
+(define-map certification-authorities
+    { authority: principal }
+    {
+        name: (string-ascii 50),
+        active: bool
+    }
+)
+
 ;; Constants
 (define-constant contract-owner tx-sender)
 (define-constant err-not-authorized (err u100))
 (define-constant err-item-not-found (err u101))
+(define-constant err-not-certification-authority (err u102))
 
 ;; Data variables
 (define-data-var last-food-id uint u0)
@@ -31,7 +41,8 @@
 ;; Register new food item
 (define-public (register-food-item 
     (product-name (string-ascii 50))
-    (location (string-ascii 100)))
+    (location (string-ascii 100))
+    (initial-certifications (list 10 (string-ascii 30))))
     (let
         ((new-id (+ (var-get last-food-id) u1)))
         (map-set food-items
@@ -42,7 +53,8 @@
                 production-date: block-height,
                 location: location,
                 status: "produced",
-                current-holder: tx-sender
+                current-holder: tx-sender,
+                certifications: initial-certifications
             }
         )
         (var-set last-food-id new-id)
@@ -55,6 +67,50 @@
             }
         )
         (ok new-id)
+    )
+)
+
+;; Add certification authority
+(define-public (add-certification-authority
+    (authority principal)
+    (name (string-ascii 50)))
+    (if (is-eq tx-sender contract-owner)
+        (begin
+            (map-set certification-authorities
+                { authority: authority }
+                {
+                    name: name,
+                    active: true
+                }
+            )
+            (ok true)
+        )
+        err-not-authorized
+    )
+)
+
+;; Add certification to food item
+(define-public (add-certification
+    (food-id uint)
+    (certification (string-ascii 30)))
+    (let 
+        ((item (unwrap! (get-food-item food-id) err-item-not-found))
+         (authority (map-get? certification-authorities {authority: tx-sender})))
+        (if (and authority (get active authority))
+            (begin
+                (map-set food-items
+                    { food-id: food-id }
+                    (merge item {
+                        certifications: (unwrap! (as-max-len? 
+                            (append (get certifications item) certification)
+                            u10)
+                            err-not-authorized)
+                    })
+                )
+                (ok true)
+            )
+            err-not-certification-authority
+        )
     )
 )
 
@@ -125,4 +181,8 @@
 
 (define-read-only (get-item-history (food-id uint))
     (ok (map-get? tracking-history { food-id: food-id }))
+)
+
+(define-read-only (get-certification-authority (authority principal))
+    (ok (map-get? certification-authorities { authority: authority }))
 )
