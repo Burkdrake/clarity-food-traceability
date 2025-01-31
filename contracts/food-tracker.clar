@@ -17,7 +17,8 @@
     {
         holder: principal,
         location: (string-ascii 100),
-        status: (string-ascii 20)
+        status: (string-ascii 20),
+        notes: (optional (string-ascii 200))
     }
 )
 
@@ -42,7 +43,8 @@
 (define-public (register-food-item 
     (product-name (string-ascii 50))
     (location (string-ascii 100))
-    (initial-certifications (list 10 (string-ascii 30))))
+    (initial-certifications (list 10 (string-ascii 30)))
+    (notes (optional (string-ascii 200))))
     (let
         ((new-id (+ (var-get last-food-id) u1)))
         (map-set food-items
@@ -63,7 +65,8 @@
             {
                 holder: tx-sender,
                 location: location,
-                status: "produced"
+                status: "produced",
+                notes: notes
             }
         )
         (ok new-id)
@@ -92,7 +95,8 @@
 ;; Add certification to food item
 (define-public (add-certification
     (food-id uint)
-    (certification (string-ascii 30)))
+    (certification (string-ascii 30))
+    (notes (optional (string-ascii 200))))
     (let 
         ((item (unwrap! (get-food-item food-id) err-item-not-found))
          (authority (map-get? certification-authorities {authority: tx-sender})))
@@ -107,6 +111,15 @@
                             err-not-authorized)
                     })
                 )
+                (map-set tracking-history
+                    { food-id: food-id, timestamp: block-height }
+                    {
+                        holder: tx-sender,
+                        location: (get location item),
+                        status: "certification_added",
+                        notes: notes
+                    }
+                )
                 (ok true)
             )
             err-not-certification-authority
@@ -118,7 +131,8 @@
 (define-public (update-status 
     (food-id uint)
     (new-status (string-ascii 20))
-    (location (string-ascii 100)))
+    (location (string-ascii 100))
+    (notes (optional (string-ascii 200))))
     (let ((item (unwrap! (get-food-item food-id) err-item-not-found)))
         (if (is-eq (get current-holder item) tx-sender)
             (begin
@@ -134,7 +148,8 @@
                     {
                         holder: tx-sender,
                         location: location,
-                        status: new-status
+                        status: new-status,
+                        notes: notes
                     }
                 )
                 (ok true)
@@ -148,7 +163,8 @@
 (define-public (transfer-ownership
     (food-id uint)
     (new-holder principal)
-    (location (string-ascii 100)))
+    (location (string-ascii 100))
+    (notes (optional (string-ascii 200))))
     (let ((item (unwrap! (get-food-item food-id) err-item-not-found)))
         (if (is-eq (get current-holder item) tx-sender)
             (begin
@@ -164,7 +180,8 @@
                     {
                         holder: new-holder,
                         location: location,
-                        status: (get status item)
+                        status: (get status item),
+                        notes: notes
                     }
                 )
                 (ok true)
