@@ -8,7 +8,7 @@ import {
 import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({
-    name: "Can register new food item with certifications",
+    name: "Can register new food item with certifications and notes",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         
@@ -16,7 +16,8 @@ Clarinet.test({
             Tx.contractCall('food-tracker', 'register-food-item', [
                 types.ascii("Organic Apples"),
                 types.ascii("Farm A, California"),
-                types.list([types.ascii("Organic"), types.ascii("Non-GMO")])
+                types.list([types.ascii("Organic"), types.ascii("Non-GMO")]),
+                types.some(types.ascii("Initial batch of seasonal harvest"))
             ], deployer.address)
         ]);
         
@@ -63,7 +64,7 @@ Clarinet.test({
 });
 
 Clarinet.test({
-    name: "Certification authority can add certification to food item",
+    name: "Certification authority can add certification with notes",
     async fn(chain: Chain, accounts: Map<string, Account>) {
         const deployer = accounts.get('deployer')!;
         const authority = accounts.get('wallet_1')!;
@@ -81,15 +82,17 @@ Clarinet.test({
             Tx.contractCall('food-tracker', 'register-food-item', [
                 types.ascii("Organic Apples"),
                 types.ascii("Farm A, California"),
-                types.list([])
+                types.list([]),
+                types.none()
             ], deployer.address)
         ]);
         
-        // Add certification
+        // Add certification with notes
         let certBlock = chain.mineBlock([
             Tx.contractCall('food-tracker', 'add-certification', [
                 types.uint(1),
-                types.ascii("USDA Organic Certified")
+                types.ascii("USDA Organic Certified"),
+                types.some(types.ascii("Annual certification renewal completed"))
             ], authority.address)
         ]);
         
